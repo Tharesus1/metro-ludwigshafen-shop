@@ -31,7 +31,7 @@ button,input,select,textarea{font:inherit}button{cursor:pointer;border:0}a{color
  <div class="topinner">
   <div class="brand"><div class="logo">▦</div><div><strong>METRO<span> LUDWIGSHAFEN</span></strong><small>Dein Marktplatz auf unserem Minecraft-Server</small></div></div>
   <div class="search"><input id="search" placeholder="Suche nach Items, Kategorien oder Stichworten …" aria-label="Produkte suchen"><button id="searchBtn">Suchen</button></div>
-  <div class="topactions"><button class="ghost" id="adminOpen">⚙ Admin</button><button class="cartbtn" id="cartOpen">🛒 Warenkorb <b id="cartCount">0</b></button></div>
+  <div class="topactions"><button class="cartbtn" id="cartOpen">🛒 Warenkorb <b id="cartCount">0</b></button></div>
  </div>
  <nav class="nav" id="nav">
   <button class="active" data-cat="Alle">⌂ Startseite</button><button data-cat="Rohstoffe">💎 Rohstoffe</button><button data-cat="Werkzeuge">⛏ Werkzeuge</button><button data-cat="Waffen">⚔ Waffen</button><button data-cat="Rüstung">🛡 Rüstung</button><button data-cat="Verzauberte Bücher">📘 Verzauberte Bücher</button><button data-cat="Nahrung">🍎 Nahrung</button><button data-cat="Sonstiges">✦ Sonstiges</button>
@@ -67,7 +67,7 @@ button,input,select,textarea{font:inherit}button{cursor:pointer;border:0}a{color
     <form id="productForm" class="formgrid">
       <div class="field"><label>Artikelname</label><input id="pName" required placeholder="z. B. Diamantblock"></div>
       <div class="field"><label>Kategorie</label><select id="pCat"><option>Rohstoffe</option><option>Werkzeuge</option><option>Rüstung</option><option>Verzauberte Bücher</option><option>Nahrung</option><option>Sonstiges</option></select></div>
-      <div class="field"><label>Preis in Burgergeld</label><input id="pPrice" type="number" min="1" required placeholder="20"></div>
+      <div class="field"><label>Preis in Burgergeld</label><input id="pPrice" type="number" min="0.01" step="0.01" inputmode="decimal" required placeholder="20,50"></div>
       <div class="field"><label>Bestand (Stück)</label><input id="pStock" type="number" min="0" required value="64"></div>
       <div class="field"><label>Symbol / Emoji</label><input id="pEmoji" maxlength="8" value="📦"></div>
       <div class="field"><label>Kurzbeschreibung</label><input id="pDesc" placeholder="Deine Beschreibung"></div>
@@ -125,7 +125,7 @@ let activeCat="Alle", searchTerm="";
 function load(k,fallback){try{const v=localStorage.getItem(k);return v?JSON.parse(v):JSON.parse(JSON.stringify(fallback))}catch(e){return JSON.parse(JSON.stringify(fallback))}}
 function save(){localStorage.setItem("metroCart_texturepack_v5_categories_netherite",JSON.stringify(cart))}
 const $=id=>document.getElementById(id);
-const fmt=n=>Number(n).toLocaleString("de-DE")+" Burgergeld";
+const fmt=n=>Number(n).toLocaleString("de-DE",{minimumFractionDigits:0,maximumFractionDigits:2})+" Burgergeld";
 function renderProducts(){
  let list=products.filter(p=>(activeCat==="Alle"||p.cat===activeCat)&&(`${p.name} ${p.cat} ${p.desc}`.toLowerCase().includes(searchTerm.toLowerCase())));
  const sort=$("sort").value;if(sort==="low")list.sort((a,b)=>a.price-b.price);if(sort==="high")list.sort((a,b)=>b.price-a.price);if(sort==="name")list.sort((a,b)=>a.name.localeCompare(b.name,"de"));
@@ -172,7 +172,7 @@ function renderOrders(){
 async function loadOrders(){if(!isAdmin)return;const {data,error}=await metroSupabaseClient.from("orders").select("*").order("created_at",{ascending:false});if(error){console.error(error);toast("Bestellungen konnten nicht geladen werden.");return}orders=data||[];renderOrders()}
 async function setStatus(id,status){if(!isAdmin)return;const {error}=await metroSupabaseClient.from("orders").update({status}).eq("id",id);if(error){alert("Status konnte nicht gespeichert werden: "+error.message);return}await loadOrders()}
 $("productForm").addEventListener("submit",async e=>{e.preventDefault();if(!isAdmin){alert("Bitte zuerst als Admin anmelden.");return}
- const p={name:$("pName").value.trim(),category:$("pCat").value,price:Math.max(1,Number($("pPrice").value)),stock:Math.max(0,Number($("pStock").value)),emoji:$("pEmoji").value||"📦",description:$("pDesc").value.trim(),tag:"Neu",active:true};
+ const p={name:$("pName").value.trim(),category:$("pCat").value,price:Math.max(0.01,Number($("pPrice").value.replace(",","."))),stock:Math.max(0,Number($("pStock").value)),emoji:$("pEmoji").value||"📦",description:$("pDesc").value.trim(),tag:"Neu",active:true};
  const {error}=await metroSupabaseClient.from("products").insert(p);if(error){alert("Produkt konnte nicht gespeichert werden: "+error.message);return}await loadProducts();renderProducts();$("productForm").reset();$("pStock").value=64;$("pEmoji").value="📦";toast("Produkt zentral gespeichert.");});
 function showAdmin(){closeCart();$("adminPanel").classList.add("show");$("adminPanel").scrollIntoView({behavior:"smooth",block:"start"});if(isAdmin){loadOrders()}else{renderOrders()}}
 async function adminLogin(){const email=prompt("Admin-E-Mail:");if(!email)return;const password=prompt("Passwort:");if(!password)return;const {data,error}=await metroSupabaseClient.auth.signInWithPassword({email,password});if(error){alert("Anmeldung fehlgeschlagen: "+error.message);return}currentUser=data.user;await checkAdmin()}
@@ -193,7 +193,7 @@ async function seedProductsIfEmpty(){const {data,error}=await metroSupabaseClien
 function toast(msg){let t=document.createElement("div");t.textContent=msg;t.style.cssText="position:fixed;bottom:20px;left:50%;transform:translateX(-50%);z-index:100;background:#f4b536;color:#171c22;padding:12px 18px;border-radius:9px;font-weight:800;box-shadow:0 8px 30px #0008";document.body.appendChild(t);setTimeout(()=>t.remove(),2200)}
 document.querySelectorAll("[data-cat]").forEach(b=>b.addEventListener("click",()=>{activeCat=b.dataset.cat;renderProducts();$("catalog").scrollIntoView({behavior:"smooth",block:"start"})}));
 $("search").addEventListener("input",e=>{searchTerm=e.target.value;renderProducts()});$("searchBtn").onclick=()=>{searchTerm=$("search").value;renderProducts();$("catalog").scrollIntoView({behavior:"smooth"})};$("sort").onchange=renderProducts;
-$("adminLogin").onclick=adminLogin;$("adminLogout").onclick=adminLogout;$("cartOpen").onclick=openCart;$("cartClose").onclick=closeCart;$("overlay").onclick=closeCart;$("checkoutBtn").onclick=openOrder;$("orderClose").onclick=closeOrder;$("cancelOrder").onclick=closeOrder;$("adminOpen").onclick=showAdmin;$("adminFooter").onclick=showAdmin;$("adminClose").onclick=()=>$("adminPanel").classList.remove("show");$("browseBtn").onclick=()=>$("catalog").scrollIntoView({behavior:"smooth"});$("howBtn").onclick=()=>document.querySelector(".lower").scrollIntoView({behavior:"smooth"});
+$("adminLogin").onclick=adminLogin;$("adminLogout").onclick=adminLogout;$("cartOpen").onclick=openCart;$("cartClose").onclick=closeCart;$("overlay").onclick=closeCart;$("checkoutBtn").onclick=openOrder;$("orderClose").onclick=closeOrder;$("cancelOrder").onclick=closeOrder;$("adminFooter").onclick=showAdmin;$("adminClose").onclick=()=>$("adminPanel").classList.remove("show");$("browseBtn").onclick=()=>$("catalog").scrollIntoView({behavior:"smooth"});$("howBtn").onclick=()=>document.querySelector(".lower").scrollIntoView({behavior:"smooth"});
 $("successClose").onclick=()=>$("successModal").classList.remove("show");$("successDone").onclick=()=>$("successModal").classList.remove("show");
 $("year").textContent=new Date().getFullYear();
 updateAdminUI();renderProducts();renderCart();renderOrders();
